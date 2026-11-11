@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geoquizz</title>
+<meta name="description" content="Un quiz de géographie en direct pour la classe. Les équipes jouent avec leur téléphone, sans compte.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23c8105c'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='3.5'%3E%3Cellipse cx='32' cy='34' rx='22' ry='15'/%3E%3Cellipse cx='32' cy='34' rx='13' ry='8.5'/%3E%3C/g%3E%3Ccircle cx='32' cy='34' r='3.5' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+:root{--paper:#fff;--wash:#f3f6f8;--ink:#0e2433;--muted:#5b6f7c;--line:#dde5ea;--accent:#c8105c;--blue:#1f6f9c;--green:#1f8a5b;--gold:#d98a00;
+ --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--body:"Inter","Segoe UI",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0;text-wrap:balance}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+.tag{font-family:var(--mono);font-size:.8rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+
+/* En-tête */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero canvas{position:absolute;inset:0;width:100%;height:100%;color:#7fa7bf;pointer-events:none}
+.hero .wrap{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:56px;align-items:center;padding-top:72px;padding-bottom:80px}
+.logo{display:flex;align-items:center;gap:12px;font-family:var(--display);font-weight:800;font-size:1.25rem;margin-bottom:56px}
+.logo svg{width:38px;height:38px;flex:none}
+.hero h1{font-size:clamp(3.2rem,8vw,6.4rem);font-weight:800;letter-spacing:-.035em}
+.hero h1 span{color:var(--accent)}
+.lead{font-size:clamp(1.1rem,1.6vw,1.3rem);color:var(--muted);margin:22px 0 34px;max-width:32em}
+.cta{display:flex;flex-wrap:wrap;gap:14px}
+.btn{display:inline-flex;align-items:center;gap:.6em;text-decoration:none;font-family:var(--display);font-weight:700;font-size:1.08rem;padding:.85em 1.6em;border-radius:999px;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px)}
+.btn.pink{background:var(--accent);color:#fff;box-shadow:0 14px 28px -14px rgba(200,16,92,.7)}
+.btn.line{background:#fff;color:var(--ink);border:2px solid var(--line)}
+.btn.line:hover{border-color:var(--ink)}
+.btn svg{width:1.1em;height:1.1em}
+.note{margin-top:18px;font-size:.9rem;color:var(--muted)}
+.note code{font-family:var(--mono);font-size:.92em;background:var(--wash);padding:.1em .4em;border-radius:6px}
+.shot{position:relative}
+.shot img{display:block;width:100%;border-radius:18px;border:1px solid var(--line);box-shadow:0 40px 80px -40px rgba(14,36,51,.55)}
+.shot .phone{position:absolute;right:-18px;bottom:-34px;width:34%;border-radius:22px;border:6px solid var(--ink);box-shadow:0 30px 50px -24px rgba(14,36,51,.6);background:#fff;overflow:hidden}
+.shot .phone img{border:0;border-radius:0;box-shadow:none}
+
+/* Sections */
+section{padding:88px 0}
+.head{display:flex;flex-direction:column;gap:12px;margin-bottom:40px;max-width:42em}
+.head h2{font-size:clamp(2rem,4vw,3rem)}
+.head p{color:var(--muted);font-size:1.1rem}
+
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.step{border:1px solid var(--line);border-radius:18px;padding:26px 26px 28px;background:#fff}
+.step b{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--ink);color:#fff;font-family:var(--display);font-size:1.25rem;margin-bottom:18px}
+.step:nth-child(2) b{background:var(--accent)}
+.step h3{font-size:1.35rem;margin-bottom:8px}
+.step p{color:var(--muted)}
+
+.quizzes{background:var(--wash);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:26px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column}
+.card img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top left;border-bottom:1px solid var(--line)}
+.card div{padding:20px 22px 24px;display:flex;flex-direction:column;gap:6px}
+.card h3{font-size:1.4rem}
+.card p{color:var(--muted)}
+.card .n{font-family:var(--mono);font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.card.text{justify-content:center;background:var(--ink);color:#fff;border-color:var(--ink)}
+.card.text div{padding:30px}
+.card.text p{color:#c9d6de}
+.card.text .n{color:#ff8cb9}
+
+.data{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.src{border-top:4px solid var(--blue);padding-top:16px}
+.src:nth-child(2){border-color:var(--green)}
+.src:nth-child(3){border-color:var(--gold)}
+.src:nth-child(4){border-color:var(--accent)}
+.src h3{font-size:1.15rem;margin-bottom:6px}
+.src p{color:var(--muted);font-size:.95rem}
+
+.score{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:56px;align-items:center}
+.score img{display:block;width:100%;border-radius:18px;border:1px solid var(--line);box-shadow:0 30px 60px -36px rgba(14,36,51,.5)}
+.pts{display:flex;gap:28px;margin-top:26px;flex-wrap:wrap}
+.pts div{display:flex;flex-direction:column}
+.pts strong{font-family:var(--display);font-size:2.6rem;line-height:1}
+.pts span{color:var(--muted);font-size:.95rem}
+.score ul{margin:22px 0 0;padding-left:1.1em;color:var(--muted)}
+.score li{margin:6px 0}
+
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--muted);font-size:.95rem}
+footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+
+@media (max-width:900px){
+ .hero .wrap,.score{grid-template-columns:1fr;gap:56px}
+ .shot{margin-right:18px}
+ .steps,.grid{grid-template-columns:1fr}
+ .data{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:560px){
+ .wrap{padding:0 16px}
+ .hero .wrap{padding-top:40px;padding-bottom:64px}
+ .logo{margin-bottom:36px}
+ section{padding:64px 0}
+ .data{grid-template-columns:1fr}
+ .btn{width:100%;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+ <canvas id="bg"></canvas>
+ <div class="wrap">
+  <div>
+   <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#c8105c"/><g fill="none" stroke="#fff" stroke-width="3.5"><ellipse cx="32" cy="34" rx="22" ry="15"/><ellipse cx="32" cy="34" rx="13" ry="8.5"/></g><circle cx="32" cy="34" r="3.5" fill="#fff"/></svg>Geoquizz</div>
+   <span class="tag">GEO1118 · Techniques géographiques · UQTR</span>
+   <h1 style="margin-top:14px">La géo, <span>en direct</span> dans la classe.</h1>
+   <p class="lead">Un quiz projeté au tableau, joué en équipe sur le téléphone. De vraies cartes, de vraies images satellitaires, de vraies données. Aucun compte à créer.</p>
+   <div class="cta">
+    <a class="btn pink" href="https://quiz-carto.tofunori.workers.dev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>Jouer avec mon équipe</a>
+    <a class="btn line" href="https://quiz-carto.tofunori.workers.dev/host"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Écran du prof</a>
+   </div>
+   <p class="note">Les équipes entrent le code de quatre lettres affiché au tableau, ou balaient le code QR.</p>
+  </div>
+  <div class="shot">
+   <img src="captures/images-satellitaires.png" alt="Écran projeté : questions sur des images Sentinel-2 de Trois-Rivières et de l'Arabie saoudite" width="2000" height="1124">
+   <div class="phone"><img src="captures/telephone.png" alt="Téléphone d'une équipe après une question réussie" width="390" height="680"></div>
+  </div>
+ </div>
+</header>
+
+<section>
+ <div class="wrap">
+  <div class="head"><span class="tag">Comment ça marche</span><h2>Trois étapes, aucune inscription.</h2></div>
+  <div class="steps">
+   <div class="step"><b>1</b><h3>Le prof lance un quiz</h3><p>Il choisit un des sept quiz sur l'écran du prof et projette le code de la partie.</p></div>
+   <div class="step"><b>2</b><h3>Les équipes se joignent</h3><p>Chaque équipe entre le code et un surnom sur son téléphone. Pas de compte, pas d'application à installer.</p></div>
+   <div class="step"><b>3</b><h3>On joue, on explique</h3><p>Après chaque question, l'écran montre la bonne réponse, une courte explication et la source des données.</p></div>
+  </div>
+ </div>
+</section>
+
+<section class="quizzes">
+ <div class="wrap">
+  <div class="head"><span class="tag">La banque de quiz</span><h2>Sept quiz de dix questions.</h2><p>Choix multiples, clic sur la carte, réponses chiffrées et climatogrammes mystères.</p></div>
+  <div class="grid">
+   <article class="card"><img src="captures/carte-topo.png" alt="Questions sur des cartes de courbes de niveau"><div><span class="n">Quiz 4</span><h3>Lire une carte topo</h3><p>Courbes de niveau tracées à partir de vraies élévations : mont Saint-Hilaire, fjord du Saguenay, cratère des Pingualuit, mont Albert, Fuji, Grand Canyon.</p></div></article>
+   <article class="card"><img src="captures/images-satellitaires.png" alt="Questions sur des images Sentinel-2"><div><span class="n">Quiz 5</span><h3>Images satellitaires</h3><p>Sentinel-2 en couleurs naturelles et en fausses couleurs : Trois-Rivières, Montréal-Trudeau, Jasper après le feu, champs à pivot, glacier d'Aletsch.</p></div></article>
+   <article class="card"><img src="captures/projections.png" alt="Questions sur les projections cartographiques"><div><span class="n">Quiz 2</span><h3>Projections</h3><p>Mercator, Equal Earth, azimutale, orthographique, indicatrices de Tissot et fuseaux UTM.</p></div></article>
+   <article class="card"><img src="captures/semiologie.png" alt="Questions sur la sémiologie graphique"><div><span class="n">Quiz 3</span><h3>Sémiologie graphique</h3><p>Variables visuelles, palettes et cartes ratées, sur les pays d'Amérique du Sud.</p></div></article>
+   <article class="card"><img src="captures/graphiques-mysteres.png" alt="Questions sur des climatogrammes et des pyramides des âges"><div><span class="n">Quiz 6</span><h3>Graphiques mystères</h3><p>Climatogrammes, pyramides des âges du Niger, du Japon, du Canada et du Qatar, et graphiques trompeurs.</p></div></article>
+   <article class="card"><img src="captures/gps.png" alt="Questions sur le GPS et les coordonnées"><div><span class="n">Quiz 7</span><h3>GPS et coordonnées</h3><p>Satellites, précision, degrés décimaux, WGS 84 et un point à placer à partir de ses coordonnées.</p></div></article>
+   <article class="card"><img src="captures/choix-du-quiz.png" alt="Écran du prof : choix du quiz"><div><span class="n">Quiz 1</span><h3>Les bases de la carte</h3><p>Lieux, coordonnées, échelle et climatogrammes. Le prof choisit le quiz avant de créer la partie.</p></div></article>
+   <article class="card text"><div><span class="n">Et ensuite</span><h3>Ajouter ses propres questions</h3><p>Chaque quiz est un simple tableau de questions dans le code. Le mode d'emploi du dépôt explique comment en écrire de nouvelles.</p><p style="margin-top:14px"><a class="btn line" href="https://github.com/tofunori/Geoquizz#ajouter-un-quiz-ou-une-question" style="color:var(--ink)">Voir le mode d'emploi</a></p></div></article>
+  </div>
+ </div>
+</section>
+
+<section>
+ <div class="wrap score">
+  <div>
+   <span class="tag">Les points</span>
+   <h2 style="font-size:clamp(2rem,4vw,3rem);margin-top:12px">Être juste, puis être rapide.</h2>
+   <div class="pts"><div><strong>1 000</strong><span>points pour la précision</span></div><div><strong>+ 500</strong><span>de bonus de rapidité</span></div></div>
+   <ul>
+    <li>Sur une carte, les points baissent avec la distance en kilomètres.</li>
+    <li>Le bonus fond à mesure que le temps passe.</li>
+    <li>Chaque téléphone affiche un message de géographie, comme « Ici, il y a des dragons » ou « Tissot serait fier ».</li>
+   </ul>
+  </div>
+  <img src="captures/messages-telephone.png" alt="Huit téléphones avec des messages différents après une question">
+ </div>
+</section>
+
+<section style="padding-top:0">
+ <div class="wrap">
+  <div class="head"><span class="tag">Des données ouvertes</span><h2>Rien n'est dessiné à la main.</h2></div>
+  <div class="data">
+   <div class="src"><h3>Natural Earth</h3><p>Fonds de carte du monde, en vraies projections d3-geo, avec le nom de la projection affiché.</p></div>
+   <div class="src"><h3>Terrain Tiles</h3><p>Modèle d'élévation mondial (Mapzen, données ouvertes sur AWS) pour les courbes de niveau.</p></div>
+   <div class="src"><h3>Copernicus Sentinel-2</h3><p>Images L2A à 10 m, lues directement dans les fichiers publics sur AWS.</p></div>
+   <div class="src"><h3>ONU et Banque mondiale</h3><p>Pyramides des âges (World Population Prospects), population et densité.</p></div>
+  </div>
+ </div>
+</section>
+
+<footer>
+ <div class="wrap">
+  <span>Geoquizz, fait pour le cours GEO1118 Techniques géographiques, UQTR, hiver 2027.</span>
+  <a href="https://github.com/tofunori/Geoquizz">Code source sur GitHub</a>
+ </div>
+</footer>
+
+<script>
+// Fond de courbes de niveau, comme dans l'app
+function contours(cv,seed){
+  const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth,H=cv.clientHeight;if(!W||!H)return;
+  cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);
+  c.strokeStyle=getComputedStyle(cv).color;
+  const f=(x,y)=>Math.sin(x*0.0041+seed)*Math.cos(y*0.0057-seed*2)+0.6*Math.sin((x+y)*0.0029+seed*3)+0.45*Math.cos(x*0.0093-y*0.0071+seed)+0.25*Math.sin(y*0.013+x*0.002);
+  const g=14,nx=Math.ceil(W/g)+1,ny=Math.ceil(H/g)+1,v=[];
+  for(let j=0;j<ny;j++){v[j]=[];for(let i=0;i<nx;i++)v[j][i]=f(i*g,j*g)}
+  const ip=(a,b,l)=>(l-a)/(b-a);
+  for(let l=-2,k=0;l<=2;l+=0.2,k++){
+    c.globalAlpha=k%5===0?0.34:0.16;c.lineWidth=k%5===0?1.4:1;c.beginPath();
+    for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){
+      const a=v[j][i],b=v[j][i+1],d=v[j+1][i],e=v[j+1][i+1],p=[];
+      if((a<l)!==(b<l))p.push([(i+ip(a,b,l))*g,j*g]);
+      if((b<l)!==(e<l))p.push([(i+1)*g,(j+ip(b,e,l))*g]);
+      if((d<l)!==(e<l))p.push([(i+ip(d,e,l))*g,(j+1)*g]);
+      if((a<l)!==(d<l))p.push([i*g,(j+ip(a,d,l))*g]);
+      if(p.length>=2){c.moveTo(p[0][0],p[0][1]);c.lineTo(p[1][0],p[1][1])}
+      if(p.length===4){c.moveTo(p[2][0],p[2][1]);c.lineTo(p[3][0],p[3][1])}
+    }
+    c.stroke();
+  }
+}
+const bg=document.getElementById("bg");
+contours(bg,2.3);
+let t;addEventListener("resize",()=>{clearTimeout(t);t=setTimeout(()=>contours(bg,2.3),150)});
+</script>
+</body>
+</html>

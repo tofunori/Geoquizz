@@ -2,7 +2,11 @@
 
 Un quiz de géographie en direct pour la classe, dans l'esprit de Kahoot, bâti pour le cours GEO1118 Techniques géographiques (UQTR, hiver 2027).
 
-Le prof projette son écran. Les équipes se joignent avec leur téléphone, sans compte, en entrant un code de quatre lettres ou en balayant un code QR. Les questions s'appuient sur de vraies cartes et de vraies données : projections d3-geo, courbes de niveau tirées d'un modèle d'élévation, images Sentinel-2, pyramides des âges de l'ONU.
+Le prof projette son écran. Les équipes se joignent avec leur téléphone, sans compte, en entrant un code de quatre lettres ou en balayant un code QR. Les questions s'appuient sur de vraies cartes et de vraies données : projections d3-geo, courbes de niveau issues d'un modèle d'élévation, images Sentinel-2, pyramides des âges de l'ONU.
+
+**Jouer :** https://quiz-carto.tofunori.workers.dev  
+**Écran du prof :** https://quiz-carto.tofunori.workers.dev/host  
+**Présentation :** https://tofunori.github.io/Geoquizz/
 
 ![Choix du quiz](docs/captures/choix-du-quiz.png)
 
