@@ -1,0 +1,19 @@
+{
+  "name": "geoquizz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quiz de géographie en direct pour la classe : cartes, projections, images satellitaires, graphiques",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "test": "node tests/partie.js && node tests/accueil.js"
+  },
+  "devDependencies": {
+    "d3": "7.9.0",
+    "playwright": "^1.48.0",
+    "qrcode-generator": "2.0.4",
+    "topojson-client": "3.1.0",
+    "world-atlas": "2.0.2",
+    "wrangler": "^4.0.0"
+  }
+}

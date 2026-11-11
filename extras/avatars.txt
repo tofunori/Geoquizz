@@ -1,0 +1,31 @@
+// Avatars des équipes : un symbole de géographie, une couleur et un fond de carte.
+const AVS=[
+ ["Montagne",c=>`<path d="M6 48 24 19l8 13 6-9 20 25z" fill="#fff"/><path d="M18.6 27.5l3.2 3 2.8-3.6 2.8 3.6 2-2.4M34.5 28.5l2.6 2.6 2.4-3 2.6 3.2" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round"/>`],
+ ["Volcan",c=>`<path d="M9 49 25 25h14l16 24z" fill="#fff"/><path d="M25 25h14l-3.4 6.5-3.6-3.8-3.6 4.6z" fill="${c}"/><circle cx="30" cy="16" r="4.6" fill="#fff"/><circle cx="37.5" cy="11.5" r="3.4" fill="#fff" fill-opacity=".8"/><circle cx="43.5" cy="8.5" r="2.2" fill="#fff" fill-opacity=".6"/>`],
+ ["Boussole",c=>`<circle cx="32" cy="32" r="20" fill="none" stroke="#fff" stroke-width="4"/><path d="M32 16.5 38 32H26z" fill="#fff"/><path d="M26 32h12l-6 15.5z" fill="#fff" fill-opacity=".5"/><circle cx="32" cy="32" r="2.6" fill="${c}"/>`],
+ ["Globe",c=>`<g fill="none" stroke="#fff" stroke-width="3.2"><circle cx="32" cy="32" r="20"/><ellipse cx="32" cy="32" rx="8.5" ry="20"/><path d="M12 32h40M15.5 21.5h33M15.5 42.5h33"/></g>`],
+ ["Épingle",c=>`<path d="M32 9c-9.6 0-17 7.2-17 16.4C15 38 32 55 32 55s17-17 17-29.6C49 16.2 41.6 9 32 9z" fill="#fff"/><circle cx="32" cy="26" r="6.4" fill="${c}"/>`],
+ ["Satellite",c=>`<g transform="rotate(-40 32 32)"><rect x="24.5" y="22" width="15" height="18" rx="3" fill="#fff"/><rect x="5" y="25" width="16" height="12" rx="1.5" fill="#fff"/><rect x="43" y="25" width="16" height="12" rx="1.5" fill="#fff"/><path d="M21 31h3.5M39.5 31H43M32 40v5" stroke="#fff" stroke-width="3"/><path d="M10.3 25v12M15.7 25v12M48.3 25v12M53.7 25v12" stroke="${c}" stroke-width="1.6"/><path d="M25 45.5a7 7 0 0 0 14 0z" fill="#fff"/></g>`],
+ ["Drone",c=>`<path d="M19 19 45 45M45 19 19 45" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/><g fill="none" stroke="#fff" stroke-width="3.4"><circle cx="17" cy="17" r="8.5"/><circle cx="47" cy="17" r="8.5"/><circle cx="17" cy="47" r="8.5"/><circle cx="47" cy="47" r="8.5"/></g><rect x="24.5" y="24.5" width="15" height="15" rx="4.5" fill="#fff"/><circle cx="32" cy="32" r="3" fill="${c}"/>`],
+ ["Sapin",c=>`<path d="M32 7 42.5 22H37l10 13.5h-6L51 49H13l10-13.5h-6L27 22h-5.5z" fill="#fff"/><rect x="28.5" y="49" width="7" height="8" fill="#fff"/>`],
+ ["Vagues",c=>`<path d="M9 22c4-6 7.5-6 11.5 0s7.5 6 11.5 0 7.5-6 11.5 0 7.5 6 11.5 0M9 34c4-6 7.5-6 11.5 0s7.5 6 11.5 0 7.5-6 11.5 0 7.5 6 11.5 0M9 46c4-6 7.5-6 11.5 0s7.5 6 11.5 0 7.5-6 11.5 0 7.5 6 11.5 0" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round"/>`],
+ ["Iceberg",c=>`<path d="M21 33 27 17l6 6 5-11 7 21z" fill="#fff"/><path d="M17 37h31l-2 9-10 9-13-4z" fill="#fff" fill-opacity=".5"/><path d="M7 35h50" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>`],
+ ["Carte",c=>`<path d="M10 19 24 13l16 6 14-6v32l-14 6-16-6-14 6z" fill="#fff"/><path d="M24 13v32M40 19v32" stroke="${c}" stroke-width="2"/><path d="M15 38c5-8 6-3 11-10" fill="none" stroke="${c}" stroke-width="2" stroke-dasharray="3 3"/><circle cx="47" cy="27" r="3.2" fill="${c}"/>`],
+ ["Rose des vents",c=>`<path d="M42 22 37.5 32 42 42 32 37.5 22 42 26.5 32 22 22 32 26.5z" fill="#fff" fill-opacity=".55"/><path d="M32 7 36.5 27.5 57 32 36.5 36.5 32 57 27.5 36.5 7 32 27.5 27.5z" fill="#fff"/><circle cx="32" cy="32" r="2.6" fill="${c}"/>`],
+ ["Pluie",c=>`<path d="M19 37a9 9 0 0 1 1.6-17.9A12 12 0 0 1 43.5 21 8.5 8.5 0 0 1 45 37z" fill="#fff"/><path d="M22 44l-2.5 7M32 44l-2.5 7M42 44l-2.5 7" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>`],
+ ["Ville",c=>`<path d="M9 52V31h11v21zM23 52V13h15v39zM41 52V25h14v27z" fill="#fff"/><path d="M27 19h7M27 25.5h7M27 32h7M27 38.5h7M12.5 37h4M12.5 43.5h4M45 31.5h6M45 38h6M45 44.5h6" stroke="${c}" stroke-width="2.4"/>`],
+ ["Cactus",c=>`<path d="M32 54V14" stroke="#fff" stroke-width="10" stroke-linecap="round"/><path d="M32 39H20.5V27M32 44h11.5V31" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>`],
+ ["Usine",c=>`<path d="M8 52V34l11 6.5V34l11 6.5V34l11 6.5V14h9v38z" fill="#fff"/><path d="M14 46h5M25 46h5M36 46h5" stroke="${c}" stroke-width="3"/><circle cx="46" cy="8" r="2.6" fill="#fff" fill-opacity=".7"/>`]
+];
+const AVF=[
+ ["Uni",""],
+ ["Courbes",`<g transform="rotate(-24 46 15)">${[1,2,3,4,5,6].map(i=>`<ellipse cx="46" cy="15" rx="${i*9.5}" ry="${i*7}"/>`).join("")}</g>`],
+ ["Quadrillage",`<path d="M8 0v64M20 0v64M32 0v64M44 0v64M56 0v64M0 8h64M0 20h64M0 32h64M0 44h64M0 56h64"/>`],
+ ["Points",`<path stroke-width="2.6" stroke-linecap="round" d="${Array.from({length:63},(_,i)=>`M${(i%9)*8+(Math.floor(i/9)%2?4:0)+0.5} ${Math.floor(i/9)*9+5}h.01`).join("")}"/>`],
+ ["Hachures",`<path d="M-2 14 14-2M-2 30 30-2M-2 46 46-2M-2 62 62-2M14 66 66 14M30 66 66 30M46 66 66 46"/>`]
+];
+const avOf=p=>Array.isArray(p.av)?p.av:[(p.color||0)%AVS.length,(p.color||0)%COLORS.length,0];
+function avatar(p,cls){
+  const a=avOf(p),col=COLORS[a[1]%COLORS.length],S=AVS[a[0]%AVS.length];
+  return `<svg class="av${cls?" "+cls:""}" viewBox="0 0 64 64" role="img" aria-label="${S[0]}"><rect width="64" height="64" fill="${col}"/><g fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1.5">${AVF[a[2]%AVF.length][1]}</g>${S[1](col)}</svg>`;
+}

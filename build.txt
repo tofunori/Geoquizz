@@ -1,0 +1,54 @@
+// Préparation des cartes par l'écran du prof : chaque carte est bâtie une seule fois à partir de données ouvertes, puis gardée sur le serveur.
+async function prepare(z,pin,onp){
+  const A=(z&&z.assets)||[];
+  for(let i=0;i<A.length;i++){
+    const a=A[i];onp(i,A.length);
+    const r=await fetch("/a/"+a.key);if(r.ok)continue;
+    const o=a.kind==="topo"?await buildTopo(a):await buildSat(a);
+    const p=await fetch("/a/"+a.key,{method:"PUT",headers:{"x-pin":pin,"content-type":o.type},body:o.body});
+    if(p.status===403)throw new Error("pin");
+    if(!p.ok)throw new Error("envoi");
+  }
+}
+// Élévations : tuiles Terrain Tiles (format terrarium) moyennées sur une grille de 192 par 108.
+async function buildTopo(t){
+  const GW=192,GH=108,B=topoBounds(t),z=B.z,tx0=Math.floor(B.x0/256),tx1=Math.floor((B.x0+B.wpx)/256),ty0=Math.floor(B.y0/256),ty1=Math.floor((B.y0+B.hpx)/256);
+  const cw=(tx1-tx0+1)*256,ch=(ty1-ty0+1)*256,cv=document.createElement("canvas");cv.width=cw;cv.height=ch;
+  const c=cv.getContext("2d",{willReadFrequently:true}),jobs=[];
+  for(let ty=ty0;ty<=ty1;ty++)for(let tx=tx0;tx<=tx1;tx++)jobs.push(new Promise((ok,ko)=>{const im=new Image();im.crossOrigin="anonymous";
+    im.onload=()=>{c.drawImage(im,(tx-tx0)*256,(ty-ty0)*256);ok()};im.onerror=()=>ko(new Error("tuile"));
+    im.src=`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${tx}/${ty}.png`}));
+  await Promise.all(jobs);
+  const d=c.getImageData(0,0,cw,ch).data,ox=B.x0-tx0*256,oy=B.y0-ty0*256,sx=B.wpx/GW,sy=B.hpx/GH,F=new Float64Array(GW*GH);
+  for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){
+    const a0=Math.floor(oy+j*sy),a1=Math.max(Math.floor(oy+(j+1)*sy),a0+1),b0=Math.floor(ox+i*sx),b1=Math.max(Math.floor(ox+(i+1)*sx),b0+1);let s=0,n=0;
+    for(let a=a0;a<a1;a++)for(let b=b0;b<b1;b++){const p=4*(a*cw+b);s+=d[p]*256+d[p+1]+d[p+2]/256-32768;n++}
+    F[j*GW+i]=s/n}
+  const at=(i,j)=>F[Math.min(GH-1,Math.max(0,j))*GW+Math.min(GW-1,Math.max(0,i))],C=new Uint8Array(GW*GH),W=new Uint8Array(GW*GH);
+  for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){let lo=1e9,hi=-1e9;for(let dj=-2;dj<=2;dj++)for(let di=-2;di<=2;di++){const v=at(i+di,j+dj);if(v<lo)lo=v;if(v>hi)hi=v}C[j*GW+i]=hi-lo<0.01?1:0}
+  for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){if(!C[j*GW+i])continue;const v=F[j*GW+i];
+    for(let dj=-2;dj<=2;dj++)for(let di=-2;di<=2;di++){const jj=j+dj,ii=i+di;if(ii<0||jj<0||ii>=GW||jj>=GH)continue;if(Math.abs(F[jj*GW+ii]-v)<0.01)W[jj*GW+ii]=1}}
+  const seen=new Uint8Array(GW*GH);
+  for(let k0=0;k0<W.length;k0++){if(!W[k0]||seen[k0])continue;const comp=[],st=[k0];seen[k0]=1;
+    while(st.length){const k=st.pop();comp.push(k);const i=k%GW,j=(k-i)/GW;
+      for(const [ii,jj] of [[i+1,j],[i-1,j],[i,j+1],[i,j-1]]){if(ii<0||jj<0||ii>=GW||jj>=GH)continue;const kk=jj*GW+ii;if(W[kk]&&!seen[kk]){seen[kk]=1;st.push(kk)}}}
+    if(comp.length<45)for(const k of comp)W[k]=0}
+  if(t.lake){const st=[[Math.floor((B.mx(t.lake.lon)-B.x0)/sx),Math.floor((B.my(t.lake.lat)-B.y0)/sy)]];
+    while(st.length){const [i,j]=st.pop();if(i<0||j<0||i>=GW||j>=GH||W[j*GW+i]||F[j*GW+i]>t.lake.alt)continue;W[j*GW+i]=1;st.push([i+1,j],[i-1,j],[i,j+1],[i,j-1])}}
+  const out=new Uint16Array(GW*GH);for(let k=0;k<out.length;k++)out[k]=Math.round((F[k]+100)*5)*2+W[k];
+  return {body:out.buffer,type:"application/octet-stream"};
+}
+// Images Sentinel-2 : lecture directe des fichiers COG publics (AWS), extrait de 1280 par 720, envoyé en JPEG.
+async function buildSat(a){
+  if(!window.GeoTIFF)await new Promise((ok,ko)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js";s.onload=ok;s.onerror=()=>ko(new Error("geotiff"));document.head.appendChild(s)});
+  const W=1280,H=720,base="https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/"+a.scene+"/";
+  const rd=async(b,inter)=>{const t=await GeoTIFF.fromUrl(base+b+".tif");return t.readRasters({bbox:a.bb,width:W,height:H,interleave:inter,resampleMethod:"bilinear"})};
+  const cv=document.createElement("canvas");cv.width=W;cv.height=H;const c=cv.getContext("2d"),im=c.createImageData(W,H),d=im.data;
+  if(a.bands==="TCI"){const r=await rd("TCI",true);for(let i=0;i<W*H;i++){d[4*i]=r[3*i];d[4*i+1]=r[3*i+1];d[4*i+2]=r[3*i+2];d[4*i+3]=255}}
+  else{const R=await Promise.all(a.bands.map(b=>rd(b,false)));
+    for(let k=0;k<3;k++){const r=R[k][0],lo=a.lo[k],f=255/(a.hi[k]-lo);for(let i=0;i<W*H;i++)d[4*i+k]=(r[i]-lo)*f}
+    for(let i=0;i<W*H;i++)d[4*i+3]=255}
+  c.putImageData(im,0,0);
+  const blob=await new Promise(ok=>cv.toBlob(ok,"image/jpeg",0.86));
+  return {body:blob,type:"image/jpeg"};
+}

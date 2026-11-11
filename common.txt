@@ -1,0 +1,238 @@
+const COLORS=["#c8105c","#1f6f9c","#1f8a5b","#d98a00","#6a3fb5","#d2491f","#0f8f95","#e0559b","#243b6b","#6f9a1b","#8a5a2b","#55636e"];
+const MOIS=["J","F","M","A","M","J","J","A","S","O","N","D"];
+const fr=(n,d=0)=>Number(n).toLocaleString("fr-CA",{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const $=s=>document.querySelector(s);
+let GEO=null,CUR=null;
+const MW=1600,MH=900;
+
+async function loadMap(){
+  try{
+    const w=await (await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json")).json();
+    GEO={c:topojson.feature(w,w.objects.countries).features,land:topojson.feature(w,w.objects.land),borders:topojson.mesh(w,w.objects.countries,(a,b)=>a!==b)};
+  }catch(e){console.warn("Fond de carte indisponible",e)}
+}
+
+function mkProj(p){
+  const pr=d3[p.type]();
+  if(p.rotate)pr.rotate(p.rotate);
+  if(p.parallels)pr.parallels(p.parallels);
+  if(p.sphere){
+    const box=[[24,24],[MW-24,MH-24]];
+    if(p.type==="geoMercator"){pr.fitExtent(box,{type:"MultiPoint",coordinates:[[-179.99,-66],[179.99,84]]});pr.clipExtent([pr([-179.99,84]),pr([179.99,-66])]);}
+    else pr.fitExtent(box,{type:"Sphere"});
+    return pr;}
+  const [w,s,e,n]=p.region,c=[];
+  for(let k=0;k<=20;k++)c.push([w+(e-w)*k/20,s]);
+  for(let k=0;k<=20;k++)c.push([e,s+(n-s)*k/20]);
+  for(let k=0;k<=20;k++)c.push([e-(e-w)*k/20,n]);
+  for(let k=0;k<=20;k++)c.push([w,n-(n-s)*k/20]);
+  pr.fitExtent([[0,0],[MW,MH]],{type:"LineString",coordinates:c});
+  // Remplir tout le cadre : on agrandit jusqu'à ce que la région couvre l'écran dans sa plus petite dimension.
+  const b=d3.geoPath(pr).bounds({type:"LineString",coordinates:c}),k=p.fit==="contain"?1:Math.min(1.35,Math.max(MW/(b[1][0]-b[0][0]),MH/(b[1][1]-b[0][1])));
+  const t=pr.translate();pr.scale(pr.scale()*k).translate([MW/2+(t[0]-MW/2)*k,MH/2+(t[1]-MH/2)*k]);
+  pr.clipExtent([[0,0],[MW,MH]]);
+  return pr;
+}
+const XY=(lat,lon)=>CUR(([lon,lat]))||[-99,-99];
+const near=(p,q)=>p&&Math.abs(p[0]-q[0])<0.01&&Math.abs(p[1]-q[1])<0.01;
+
+const PAL={seq:["#fde6ee","#f6b3cb","#e9719f","#c8105c","#7a0637"],arc:["#4daf4a","#e41a1c","#377eb8","#ffd92f","#984ea3"],cat:["#1f6f9c","#12804a","#d98a00","#7b5ea7"]};
+const THV={dens:{b:[10,20,30,50],l:["Moins de 10","10 à 20","20 à 30","30 à 50","Plus de 50"],t:"Habitants par km²",s:"Banque mondiale, 2022"},
+ pop:{b:[5,20,40,100],l:["Moins de 5","5 à 20","20 à 40","40 à 100","Plus de 100"],t:"Population, en millions",s:"Banque mondiale, 2023"}};
+function themSvg(q,path){
+  const t=q.thema,D=q.data;if(!t||!D||!GEO||!GEO.c)return "";
+  const F=GEO.c.filter(f=>D[f.id]);let h="",rows=[],title="",src="";
+  if(t.mode==="circ"){
+    const R=v=>74*Math.sqrt(v/211.1);
+    h=F.slice().sort((a,b)=>D[b.id].pop-D[a.id].pop).map(f=>{const c=path.centroid(f);return `<circle class="pc" cx="${c[0]}" cy="${c[1]}" r="${R(D[f.id].pop)}"/>`}).join("");
+    const lx=70,base=MH-96;
+    return h+`<g><text class="lgt" x="${lx}" y="${base-2*R(200)-34}">Population</text>`+[200,50,10].map(v=>`<circle class="pcl" cx="${lx+R(200)}" cy="${base-R(v)}" r="${R(v)}"/><line class="pcl" x1="${lx+R(200)}" x2="${lx+2*R(200)+26}" y1="${base-2*R(v)}" y2="${base-2*R(v)}"/><text class="lgl" x="${lx+2*R(200)+36}" y="${base-2*R(v)+10}">${v} millions</text>`).join("")+`<text class="lgs" x="${lx}" y="${MH-36}">Source : Banque mondiale, 2023</text></g>`;
+  }
+  if(t.mode==="cat"){
+    const L=["Espagnol","Portugais","Anglais","Néerlandais"];
+    h=F.map(f=>`<path class="th" fill="${PAL.cat[D[f.id].lang]}" d="${path(f)}"/>`).join("");rows=L.map((l,i)=>[PAL.cat[i],l]);title="Langue officielle principale";
+  }else{
+    const k=THV[t.v],cl=v=>k.b.filter(b=>v>=b).length;
+    h=F.map(f=>`<path class="th" fill="${PAL[t.pal][cl(D[f.id][t.v])]}" d="${path(f)}"/>`).join("");rows=k.l.map((l,i)=>[PAL[t.pal][i],l]);title=k.t;src=k.s;
+  }
+  if(t.noleg)return h;
+  const lx=70,ly=MH-(src?84:50)-rows.length*54;
+  return h+`<g><text class="lgt" x="${lx}" y="${ly-24}">${title}</text>`+rows.map((r,i)=>`<rect class="lgr" x="${lx}" y="${ly+i*54}" width="66" height="42" fill="${r[0]}"/><text class="lgl" x="${lx+86}" y="${ly+i*54+31}">${r[1]}</text>`).join("")+(src?`<text class="lgs" x="${lx}" y="${MH-36}">Source : ${src}</text>`:"")+`</g>`;
+}
+function palSvg(){
+  const P=[["#fff0f5","#fbd0df","#f4a3c0","#e9719f","#d63d7c","#b00e53","#7a0637"],["#2166ac","#67a9cf","#d1e5f0","#f7f7f7","#fddbc7","#ef8a62","#b2182b"],["#1f6f9c","#d98a00","#12804a","#c8105c","#7b5ea7","#8c6d31","#5b6f7c"],["#f2f2f2","#d9d9d9","#bdbdbd","#969696","#737373","#525252","#252525"]];
+  return `<svg class="map" viewBox="0 0 ${MW} ${MH}" role="img" aria-label="Quatre palettes de couleurs"><rect width="${MW}" height="${MH}" fill="#fff"/>`+P.map((p,i)=>`<text class="lgt" style="font-size:46px" x="90" y="${118+i*200+76}">Palette ${i+1}</text>`+p.map((c,j)=>`<rect class="lgr" x="${420+j*150}" y="${118+i*200}" width="150" height="124" fill="${c}"/>`).join("")).join("")+`</svg>`;
+}
+function mapSvg(q){
+  const pr=CUR=mkProj(q.proj),path=d3.geoPath(pr),sp=q.proj.sphere,st=q.grat||(sp?30:10);
+  let g="",lab="",lastX=-1e9;
+  const inv=(L,B)=>{const p=pr([L,B]);if(!p||p[0]<0||p[0]>MW||p[1]<0||p[1]>MH)return null;const r=pr.invert(p);return near(r,[L,B])?p:null};
+  for(let L=-180;L<180;L+=st){
+    g+=`<path class="gr${L===0?" gr0":""}" d="${path({type:"LineString",coordinates:d3.range(-85,85.01,1).map(B=>[L,B])})||""}"/>`;
+    if(q.grat&&!sp){let best=null;for(let B=-85;B<=85;B+=0.2){const p=inv(L,B);if(p&&(!best||Math.abs(p[1]-(MH-26))<Math.abs(best[1]-(MH-26))))best=p}
+      if(best&&Math.abs(best[1]-(MH-26))<8&&best[0]>70&&best[0]<MW-90&&best[0]-lastX>95&&(lastX=best[0]))lab+=`<text class="grl" x="${best[0]+8}" y="${MH-16}">${L===0?"0°":Math.abs(L)+"° "+(L<0?"O":"E")}</text>`;}
+  }
+  for(let B=-80;B<=80;B+=st){
+    g+=`<path class="gr${B===0?" gr0":""}" d="${path({type:"LineString",coordinates:d3.range(-180,180.01,1).map(L=>[L,B])})||""}"/>`;
+    if(q.grat&&!sp){let best=null;for(let L=-180;L<=180;L+=0.2){const p=inv(L,B);if(p&&(!best||Math.abs(p[0]-14)<Math.abs(best[0]-14)))best=p}
+      if(best&&Math.abs(best[0]-14)<8&&best[1]>50&&best[1]<MH-70)lab+=`<text class="grl" x="14" y="${best[1]-9}">${B===0?"0°":Math.abs(B)+"° "+(B<0?"S":"N")}</text>`;}
+  }
+  if(q.grat&&sp){
+    for(let L=-120;L<=120;L+=60){const p=inv(L,0);if(p)lab+=`<text class="grl" x="${p[0]+8}" y="${p[1]-10}">${L===0?"0°":Math.abs(L)+"° "+(L<0?"O":"E")}</text>`}
+    for(let B=-60;B<=60;B+=30){if(!B)continue;const p=inv(0,B);if(p)lab+=`<text class="grl" x="${p[0]+8}" y="${p[1]-10}">${Math.abs(B)+"° "+(B<0?"S":"N")}</text>`}
+  }
+  let tis="";
+  if(q.tissot){const c=[];for(let L=-150;L<=150;L+=30)for(let B=-60;B<=60;B+=30)c.push(d3.geoCircle().center([L,B]).radius(5.5)().coordinates);tis=`<path class="tis" d="${path({type:"MultiPolygon",coordinates:c})||""}"/>`;}
+  const sph=sp?path({type:"Sphere"}):"";
+  return `<svg class="map${q.grat?" graton":""}" id="map" viewBox="0 0 ${MW} ${MH}" role="img" aria-label="Carte">
+   <defs><radialGradient id="seag" cx="50%" cy="45%" r="75%"><stop offset="0" class="sea0"/><stop offset="1" class="sea1"/></radialGradient>
+   <filter id="coast" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="7"/></filter>${sp?`<clipPath id="sphc"><path d="${sph}"/></clipPath>`:""}</defs>
+   ${sp?`<rect class="void" width="${MW}" height="${MH}"/><path d="${sph}" fill="url(#seag)"/>`:`<rect width="${MW}" height="${MH}" fill="url(#seag)"/>`}
+   <g ${sp?`clip-path="url(#sphc)"`:""}>${GEO?`<path class="shore" filter="url(#coast)" d="${path(GEO.land)}"/><path class="land" d="${path(GEO.land)}"/><path class="cb" d="${path(GEO.borders)}"/>${themSvg(q,path)}`:""}</g>
+   <g>${g}</g>${tis}${sp?`<path class="sph" d="${sph}"/>`:""}${lab}<g id="marks"></g>
+   <text class="projname" x="${MW-14}" y="${q.grat?26:MH-16}" text-anchor="end">${esc(q.proj.name)}</text></svg>`;
+}
+const mark=h=>{const m=$("#marks");if(m)m.insertAdjacentHTML("beforeend",h)};
+const dot=(lat,lon,cls,color,k=1)=>{const [x,y]=XY(lat,lon);return `<circle class="${cls}" ${color?`style="fill:${color}"`:""} cx="${x}" cy="${y}" r="${13*k}"/>`};
+const target=(lat,lon)=>{const [x,y]=XY(lat,lon);return `<circle class="target halo" cx="${x}" cy="${y}" r="46"/><circle class="target" cx="${x}" cy="${y}" r="27"/><circle class="targetdot" cx="${x}" cy="${y}" r="8"/>`};
+const arc=(a,b)=>!CUR.stream?`<path class="link" d="M${XY(a.lat,a.lon).join(",")}L${XY(b.lat,b.lon).join(",")}"/>`:`<path class="link" d="${d3.geoPath(CUR)({type:"LineString",coordinates:[[a.lon,a.lat],[b.lon,b.lat]]})||""}"/>`;
+function pickAt(svg,e){const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());const r=CUR.invert([p.x,p.y]);return r&&isFinite(r[0])&&isFinite(r[1])?{lon:r[0],lat:r[1]}:null}
+
+function climSvg(c){
+  const W=800,H=420,L=58,R=58,T=30,B=42,pw=W-L-R,ph=H-T-B,PM=180,T0=-30,T1=30;
+  const yp=v=>T+ph-(v/PM)*ph,yt=v=>T+ph-((v-T0)/(T1-T0))*ph,bw=pw/12;
+  let s=`<svg class="clim" viewBox="0 0 ${W} ${H}" role="img" aria-label="Climatogramme">`;
+  for(let k=0;k<=6;k++){const y=T+ph-k*ph/6;
+    s+=`<line class="cl-ax" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text class="cl-tx cl-p" x="${L-8}" y="${y+5}" text-anchor="end">${k*30}</text><text class="cl-tx cl-tc" x="${W-R+8}" y="${y+5}">${T0+k*10}</text>`;}
+  s+=`<line class="cl-zero" x1="${L}" x2="${W-R}" y1="${yt(0)}" y2="${yt(0)}"/><text class="cl-tx cl-p" x="${L-8}" y="16" text-anchor="end">mm</text><text class="cl-tx cl-tc" x="${W-R+8}" y="16">°C</text>`;
+  c.p.forEach((v,i)=>{s+=`<rect class="cl-bar" x="${L+i*bw+bw*0.16}" y="${yp(v)}" width="${bw*0.68}" height="${T+ph-yp(v)}" rx="2"/><text class="cl-tx" x="${L+i*bw+bw/2}" y="${H-14}" text-anchor="middle">${MOIS[i]}</text>`;});
+  s+=`<polyline class="cl-t" points="${c.t.map((v,i)=>(L+i*bw+bw/2)+","+yt(v)).join(" ")}"/>`;
+  c.t.forEach((v,i)=>{s+=`<circle class="cl-dot" cx="${L+i*bw+bw/2}" cy="${yt(v)}" r="5"/>`;});
+  return s+"</svg>";
+}
+
+const ASSET={};
+async function need(q){
+  const t=q&&q.topo;if(!t||ASSET[t.key])return;
+  try{const r=await fetch("/a/"+t.key);if(r.ok)ASSET[t.key]=new Uint16Array(await r.arrayBuffer())}catch(e){}
+}
+const dkm=d=>d<1?fr(Math.round(d*100)*10)+" m":d<20?fr(d,1)+" km":fr(Math.round(d/10)*10)+" km";
+function topoBounds(t){
+  const GW=192,rad=Math.PI/180,m0=156543.03*Math.cos(t.lat*rad),z=Math.max(1,Math.min(14,Math.round(Math.log2(m0/(t.wkm*1000/GW/4))))),n=256*2**z;
+  const mx=l=>(l+180)/360*n,my=b=>{const s=Math.sin(b*rad);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n};
+  const ux=x=>x/n*360-180,uy=y=>Math.atan(Math.sinh(Math.PI*(1-2*y/n)))/rad;
+  const wpx=t.wkm*1000/(m0/2**z),hpx=wpx*9/16,x0=mx(t.lon)-wpx/2,y0=my(t.lat)-hpx/2;
+  return {z,x0,y0,wpx,hpx,w:ux(x0),e:ux(x0+wpx),n:uy(y0),s:uy(y0+hpx),mx,my};
+}
+function topoSvg(q){
+  const t=q.topo,GW=192,GH=108,R=ASSET[t.key],k=MW/GW,B=topoBounds(t);
+  CUR=d3.geoMercator().fitExtent([[0,0],[MW,MH]],{type:"LineString",coordinates:[[B.w,B.n],[B.e,B.s]]});
+  if(!R)return `<svg class="map topo" id="map" viewBox="0 0 ${MW} ${MH}"><rect width="${MW}" height="${MH}" class="tpaper"/><text class="lgt" x="${MW/2}" y="${MH/2}" text-anchor="middle">Carte indisponible</text><g id="marks"></g></svg>`;
+  const G=new Array(GW*GH),W=new Array(GW*GH);let lo=Infinity,hi=-Infinity;
+  for(let i=0;i<G.length;i++){const v=(R[i]>>1)/5-100;G[i]=v;W[i]=R[i]&1;if(v<lo)lo=v;if(v>hi)hi=v}
+  const tr=d3.geoPath(d3.geoTransform({point(x,y){this.stream.point(x*k,y*k)}}));
+  const eq=t.eq,ix=eq*(t.idx||5),C=d3.contours().size([GW,GH]).smooth(true).thresholds(d3.range(Math.ceil((lo+0.5)/eq)*eq,hi,eq))(G);
+  const water=d3.contours().size([GW,GH]).smooth(true).thresholds([0.5])(W)[0];
+  let thin="",thick="",labs="";const placed=[];
+  for(const c of C){
+    const isI=Math.abs(c.value/ix-Math.round(c.value/ix))<1e-6,d=tr(c)||"";
+    if(!isI){thin+=d;continue}
+    thick+=d;
+    for(const poly of c.coordinates)for(const ring of poly){
+      let acc=0,next=200;
+      for(let p=1;p<ring.length;p++){
+        const x0=ring[p-1][0]*k,y0=ring[p-1][1]*k,x1=ring[p][0]*k,y1=ring[p][1]*k;acc+=Math.hypot(x1-x0,y1-y0);
+        if(acc<next)continue;
+        if(x1<80||x1>MW-80||y1<50||y1>MH-110)continue;
+        if(W[Math.min(GH-1,Math.floor(ring[p][1]))*GW+Math.min(GW-1,Math.floor(ring[p][0]))])continue;
+        if(placed.some(o=>Math.hypot(o[0]-x1,o[1]-y1)<170))continue;
+        next=acc+600;placed.push([x1,y1]);
+        let a=Math.atan2(y1-y0,x1-x0)*180/Math.PI;if(a>90)a-=180;if(a<-90)a+=180;
+        labs+=`<text class="tl" transform="translate(${x1.toFixed(1)},${y1.toFixed(1)}) rotate(${a.toFixed(1)})" dy="0.35em" text-anchor="middle">${c.value}</text>`;
+      }
+    }
+  }
+  const mpp=t.wkm*1000/MW,L=[100,200,500,1000,2000,5000,10000].reduce((b,v)=>Math.abs(v/mpp-280)<Math.abs(b/mpp-280)?v:b),Lp=L/mpp,sx=MW-64-Lp,sy=MH-44,lab=v=>v>=1000?fr(v/1000,v%1000?1:0)+" km":v+" m";
+  const pts=(t.pts||[]).map(p=>{const [x,y]=XY(p.lat,p.lon);return `<g class="tpt"><circle cx="${x}" cy="${y}" r="13"/><text x="${x+20}" y="${y-16}">${p.l}</text></g>`}).join("");
+  return `<svg class="map topo" id="map" viewBox="0 0 ${MW} ${MH}" role="img" aria-label="Carte topographique">
+   <rect width="${MW}" height="${MH}" class="tpaper"/><path class="tc" d="${thin}"/><path class="tci" d="${thick}"/>
+   ${water?`<path class="twat" d="${tr(water)||""}"/>`:""}${labs}${pts}<g id="marks"></g>
+   <g class="tno" transform="translate(${MW-64},74)"><path d="M0,-38 L15,12 L0,3 L-15,12 Z"/><text y="44" text-anchor="middle">N</text></g>
+   <g class="tsc"><rect x="${sx}" y="${sy}" width="${Lp/2}" height="12" class="k"/><rect x="${sx+Lp/2}" y="${sy}" width="${Lp/2}" height="12" class="w"/>
+    <text x="${sx}" y="${sy-12}" text-anchor="middle">0</text><text x="${sx+Lp/2}" y="${sy-12}" text-anchor="middle">${lab(L/2)}</text><text x="${sx+Lp}" y="${sy-12}" text-anchor="middle">${lab(L)}</text></g>
+   ${t.noeq?"":`<text class="tleg" x="24" y="${MH-52}">Équidistance des courbes : ${eq} m</text>`}
+   <text class="tsrc" x="24" y="${MH-22}">Élévations : Terrain Tiles (Mapzen, données ouvertes sur AWS)</text></svg>`;
+}
+function satSvg(q){
+  const s=q.sat,[A,B,C]=s.c,e1=[B[0]-A[0],B[1]-A[1]],e2=[C[0]-A[0],C[1]-A[1]],det=e1[0]*e2[1]-e1[1]*e2[0];
+  CUR=p=>{const dx=p[0]-A[0],dy=p[1]-A[1];return [(dx*e2[1]-dy*e2[0])/det*MW,(dy*e1[0]-dx*e1[1])/det*MH]};
+  CUR.invert=p=>[A[0]+p[0]/MW*e1[0]+p[1]/MH*e2[0],A[1]+p[0]/MW*e1[1]+p[1]/MH*e2[1]];
+  const mpp=s.wkm*1000/MW,L=[500,1000,2000,5000,10000].reduce((b,v)=>Math.abs(v/mpp-280)<Math.abs(b/mpp-280)?v:b),Lp=L/mpp,sx=MW-64-Lp,sy=MH-44,lab=v=>v>=1000?fr(v/1000,v%1000?1:0)+" km":v+" m";
+  return `<svg class="map sat" id="map" viewBox="0 0 ${MW} ${MH}" role="img" aria-label="Image satellitaire">
+   <rect width="${MW}" height="${MH}" fill="#10202b"/><image href="/a/${s.key}" width="${MW}" height="${MH}" preserveAspectRatio="none"/>
+   <rect class="sbox" x="0" y="${MH-92}" width="${MW}" height="92"/><g id="marks"></g>
+   <g class="ssc"><rect x="${sx}" y="${sy}" width="${Lp/2}" height="12" fill="#fff"/><rect x="${sx+Lp/2}" y="${sy}" width="${Lp/2}" height="12" fill="none" stroke="#fff" stroke-width="2"/>
+    <text x="${sx}" y="${sy-12}" text-anchor="middle">0</text><text x="${sx+Lp/2}" y="${sy-12}" text-anchor="middle">${lab(L/2)}</text><text x="${sx+Lp}" y="${sy-12}" text-anchor="middle">${lab(L)}</text></g>
+   <text class="scap" x="24" y="${MH-52}">${esc(s.cap)}</text>
+   <text class="scr" x="24" y="${MH-22}">Contient des données Copernicus Sentinel modifiées</text></svg>`;
+}
+function chartSvg(q){
+  const c=q.chart;let h=`<svg class="map chart" viewBox="0 0 ${MW} ${MH}" role="img" aria-label="Graphique"><rect width="${MW}" height="${MH}" fill="#fff"/>`;
+  if(c.t==="pyr"){
+    const AG=["0 à 4","5 à 9","10 à 14","15 à 19","20 à 24","25 à 29","30 à 34","35 à 39","40 à 44","45 à 49","50 à 54","55 à 59","60 à 64","65 à 69","70 à 74","75 à 79","80 et plus"];
+    const mx=Math.max(...c.m,...c.f),top=mx>11?15:mx>7?12:mx>5?6:4.5,st=mx>11?5:mx>7?4:mx>5?2:1.5,cx=MW/2,gap=86,bw=600,rh=41,y0=92,x=v=>v/top*bw;
+    h+=`<text class="cht" x="${cx-gap-bw/2}" y="56" text-anchor="middle" style="fill:var(--blue)">Hommes</text><text class="cht" x="${cx+gap+bw/2}" y="56" text-anchor="middle" style="fill:var(--accent)">Femmes</text><text class="chl" x="${cx}" y="56" text-anchor="middle">Âge</text>`;
+    for(let v=0;v<=top+1e-9;v+=st)for(const s of [-1,1]){const X=cx+s*(gap+x(v));h+=`<line class="chg" x1="${X}" x2="${X}" y1="${y0-6}" y2="${y0+17*rh+6}"/><text class="chl" x="${X}" y="${y0+17*rh+40}" text-anchor="middle">${fr(v,st%1?1:0)} %</text>`}
+    for(let i=0;i<17;i++){const y=y0+(16-i)*rh;
+      h+=`<rect x="${cx-gap-x(c.m[i])}" y="${y+3}" width="${x(c.m[i])}" height="${rh-6}" fill="var(--blue)"/><rect x="${cx+gap}" y="${y+3}" width="${x(c.f[i])}" height="${rh-6}" fill="var(--accent)"/><text class="chl" x="${cx}" y="${y+rh/2+9}" text-anchor="middle">${AG[i]}</text>`}
+    h+=`<text class="chs" x="${cx}" y="${MH-18}" text-anchor="middle">Part de la population totale, par groupe d'âge de cinq ans</text>`;
+  }else if(c.t==="bar"){
+    const L=170,R=80,T=130,B=120,pw=MW-L-R,ph=MH-T-B,mx=Math.max(...c.items.map(d=>d[1])),y0=c.y0||0,top=Math.ceil(mx/5)*5,y=v=>T+ph-(v-y0)/(top-y0)*ph,bw=pw/c.items.length;
+    h+=`<text class="cht" x="${L}" y="70">${esc(c.title)}</text>`;
+    for(let v=y0;v<=top;v+=5)h+=`<line class="chg" x1="${L}" x2="${MW-R}" y1="${y(v)}" y2="${y(v)}"/><text class="chl" x="${L-18}" y="${y(v)+10}" text-anchor="end">${v}</text>`;
+    c.items.forEach((d,i)=>{h+=`<rect x="${L+i*bw+bw*0.2}" y="${y(d[1])}" width="${bw*0.6}" height="${y(y0)-y(d[1])}" fill="var(--blue)"/><text class="cht" x="${L+i*bw+bw/2}" y="${y(d[1])-16}" text-anchor="middle">${fr(d[1],1)}</text><text class="chl" x="${L+i*bw+bw/2}" y="${MH-B+46}" text-anchor="middle">${esc(d[0])}</text>`});
+  }else{
+    const R=300,cx=520,cy=480,arcs=d3.pie().sort(null).value(d=>d[1])(c.items),arc=d3.arc().innerRadius(0).outerRadius(R);
+    h+=`<text class="cht" x="90" y="70">${esc(c.title)}</text><g transform="translate(${cx},${cy})">${arcs.map((a,i)=>`<path d="${arc(a)}" fill="${COLORS[i%COLORS.length]}" stroke="#fff" stroke-width="2"/>`).join("")}</g>`;
+    c.items.forEach((d,i)=>{h+=`<rect x="980" y="${150+i*56}" width="38" height="38" fill="${COLORS[i%COLORS.length]}"/><text class="chl" x="1034" y="${150+i*56+29}">${esc(d[0])}</text>`});
+  }
+  return h+`<text class="chs" x="${MW-24}" y="${c.t==="pyr"?MH-18:MH-22}" text-anchor="end">${c.t==="pyr"?"":"Source : "+esc(c.src)}</text></svg>`;
+}
+function figure(q){return q.clim?climSvg(q.clim):q.fig==="pal"?palSvg():q.chart?chartSvg(q):q.topo?topoSvg(q):q.sat?satSvg(q):q.proj?mapSvg(q):""}
+function solText(q,sol){return q.type==="num"?(q.prefix?q.prefix+" ":"")+Number(sol.ans).toLocaleString("fr-CA")+(q.unit?" "+q.unit:""):sol.label}
+
+// Lignes de niveau décoratives : champ lisse, tracé par carrés mobiles.
+function contours(cv,seed=1){
+  const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth,H=cv.clientHeight; if(!W||!H)return;
+  cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext("2d");c.scale(dpr,dpr);
+  const st=getComputedStyle(cv);c.strokeStyle=st.color;c.lineWidth=1;
+  const f=(x,y)=>Math.sin(x*0.0041+seed)*Math.cos(y*0.0057-seed*2)+0.6*Math.sin((x+y)*0.0029+seed*3)+0.45*Math.cos(x*0.0093-y*0.0071+seed)+0.25*Math.sin(y*0.013+x*0.002);
+  const g=14,nx=Math.ceil(W/g)+1,ny=Math.ceil(H/g)+1,v=[];
+  for(let j=0;j<ny;j++){v[j]=[];for(let i=0;i<nx;i++)v[j][i]=f(i*g,j*g);}
+  const ip=(a,b,l)=>(l-a)/(b-a);
+  for(let l=-2,k=0;l<=2;l+=0.2,k++){
+    c.globalAlpha=k%5===0?0.34:0.16;c.lineWidth=k%5===0?1.4:1;c.beginPath();
+    for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){
+      const a=v[j][i],b=v[j][i+1],d=v[j+1][i],e=v[j+1][i+1],pts=[];
+      if((a<l)!==(b<l))pts.push([(i+ip(a,b,l))*g,j*g]);
+      if((b<l)!==(e<l))pts.push([(i+1)*g,(j+ip(b,e,l))*g]);
+      if((d<l)!==(e<l))pts.push([(i+ip(d,e,l))*g,(j+1)*g]);
+      if((a<l)!==(d<l))pts.push([i*g,(j+ip(a,d,l))*g]);
+      for(let p=0;p+1<pts.length;p+=2){c.moveTo(pts[p][0],pts[p][1]);c.lineTo(pts[p+1][0],pts[p+1][1]);}
+    }
+    c.stroke();
+  }
+}
+
+function connect(params,onmsg,onstatus){
+  let ws,dead=false,tries=0;
+  const open=()=>{
+    ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws?"+new URLSearchParams(params()));
+    ws.onopen=()=>{tries=0;onstatus&&onstatus(true)};
+    ws.onmessage=e=>onmsg(JSON.parse(e.data));
+    ws.onclose=()=>{onstatus&&onstatus(false);if(!dead)setTimeout(open,Math.min(5000,500*++tries))};
+  };
+  open();
+  return {send:o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))},stop:()=>{dead=true;ws&&ws.close()}};
+}

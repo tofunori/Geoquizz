@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geoquizz, écran du prof</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+<script src="/common.js"></script>
+<script src="/build.js"></script>
+</head><body>
+<canvas class="bg" id="bg"></canvas>
+<div id="app"></div>
+<button class="home" id="home" hidden>Accueil</button>
+<script>
+const app=$("#app"),bg=$("#bg");
+let ST=null,conn=null,key="",off=0,sess=null,QZ=[],SEL=null;
+function newGame(){if(conn)conn.stop();sess=null;ST=null;key="";try{localStorage.removeItem("quizHost")}catch(e){}gate()}
+try{sess=JSON.parse(localStorage.getItem("quizHost")||"null")}catch(e){}
+const paint=on=>{bg.hidden=!on;if(on)contours(bg,2.3)};
+addEventListener("resize",()=>{if(!bg.hidden)contours(bg,2.3)});
+const LET=["A","B","C","D"];
+
+function gate(msg){
+  paint(true);$("#home").hidden=true;
+  app.innerHTML=`<div class="gate"><form class="card" id="f"><span class="tag">GEO1118 Techniques géographiques</span><h1>Geoquizz</h1>
+   <p>Lance une partie en direct. Les équipes se joignent avec leur téléphone, sans compte.</p>
+   ${QZ.map((z,i)=>`<label class="qz"><input type="radio" name="qz" value="${z.id}" ${(SEL?z.id===SEL:i===0)?"checked":""}><span><b>${esc(z.title)}</b><small>${esc(z.desc)}, ${z.n} questions</small></span></label>`).join("")}
+   <input class="inp" id="pin" placeholder="Mot de passe du prof" autocomplete="off" value="${esc(localStorage.getItem("quizPin")||"")}">
+   <p class="err">${msg||""}</p><button class="btn pink" type="submit">Créer une partie</button></form></div>`;
+  $("#f").onsubmit=async e=>{e.preventDefault();const pin=$("#pin").value.trim();
+    SEL=(document.querySelector("input[name=qz]:checked")||{}).value;$("#f button").disabled=true;
+    try{await prepare(QZ.find(z=>z.id===SEL),pin,(i,n)=>{$(".err").textContent=`Préparation des cartes, ${i+1} sur ${n}. Ça se fait une seule fois.`})}
+    catch(e){return gate(e.message==="pin"?"Mot de passe refusé.":"Impossible de préparer les cartes. Vérifie la connexion, puis réessaie.")}
+    const r=await fetch("/api/new",{method:"POST",body:JSON.stringify({pin,quiz:SEL})});
+    if(!r.ok)return gate(r.status===403?"Mot de passe refusé.":"Impossible de créer la partie. Réessaie.");
+    try{localStorage.setItem("quizPin",pin)}catch(e){}
+    sess=await r.json();try{localStorage.setItem("quizHost",JSON.stringify(sess))}catch(e){}
+    start();};
+}
+function start(){
+  conn=connect(()=>({code:sess.code,role:"host",key:sess.key}),m=>{if(m.t==="state"){off=m.now-Date.now();ST=m;need(m.q).then(render)}},null);
+  setTimeout(()=>{if(!ST){conn.stop();sess=null;try{localStorage.removeItem("quizHost")}catch(e){}gate()}},4000);
+}
+const send=t=>conn&&conn.send({t});
+function advance(){ if(!ST)return;
+  if(ST.phase==="lobby")send("start"); else if(ST.phase==="question")send("reveal");
+  else if(ST.phase==="reveal")send("scores"); else if(ST.phase==="scores")send("next"); }
+addEventListener("keydown",e=>{if(e.target.tagName==="INPUT")return;if(["ArrowRight","PageDown"," ","Enter"].includes(e.key)&&ST&&ST.phase!=="lobby"&&ST.phase!=="final"){e.preventDefault();advance()}});
+
+function render(){
+  $("#home").hidden=false;
+  const k=ST.phase+":"+ST.qi;
+  if(ST.phase==="lobby")return lobby();
+  if(k===key){const c=$("#cnt");if(c)c.textContent=ST.players.filter(p=>p.answered).length+" / "+ST.players.length;return}
+  key=k; paint(ST.phase==="final"||ST.phase==="scores");
+  if(ST.phase==="question")question(false); else if(ST.phase==="reveal")question(true);
+  else if(ST.phase==="scores")scores(); else final();
+}
+function teams(){
+  const box=$(".teams"),seen=new Set(),n=ST.players.length;
+  $("#nb").textContent=n?n+(n>1?" équipes prêtes":" équipe prête"):"En attente des équipes";$("#go").disabled=!n;
+  ST.players.forEach(p=>{seen.add(p.pid);let b=box.querySelector(`[data-pid="${p.pid}"]`);const sig=JSON.stringify([p.color,p.name,p.on]);
+    if(!b){b=document.createElement("button");b.dataset.pid=p.pid;b.title="Retirer cette équipe";b.onclick=()=>conn.send({t:"kick",pid:p.pid});box.appendChild(b)}
+    if(b.dataset.sig!==sig){b.dataset.sig=sig;b.className="chip"+(p.on?"":" off");b.innerHTML=`<i style="background:${COLORS[p.color]}"></i>`+esc(p.name)}});
+  box.querySelectorAll(".chip").forEach(b=>{if(!seen.has(b.dataset.pid))b.remove()});
+}
+function lobby(){
+  if(key==="lobby:"+ST.code&&$(".teams"))return teams();
+  key="lobby:"+ST.code;paint(true);
+  const url=location.host,full=location.origin+"/?c="+ST.code;
+  let qr="";try{const q=qrcode(0,"M");q.addData(full);q.make();qr=q.createSvgTag({cellSize:6,margin:0,scalable:true})}catch(e){}
+  app.innerHTML=`<div class="host"><div class="top"><span class="tag">Geoquizz · GEO1118</span><span>${esc(ST.title)} · ${ST.n} questions</span></div>
+   <div class="lobby"><div class="join"><p>Sur ton téléphone, ouvre</p><div class="url">${esc(url)}</div><p>et entre le code</p>
+     <div class="code">${ST.code.split("").map(c=>`<span>${c}</span>`).join("")}</div>${qr?`<div class="qr">${qr}</div>`:""}</div>
+    <div><h1 style="margin-bottom:.6em" id="nb"></h1><div class="teams"></div></div></div>
+   <div class="foot"><span class="top">Précision, jusqu'à 1 000 points. Bonus de rapidité, jusqu'à 500 points. &nbsp; <button class="lnk" id="chg">Changer de quiz</button></span><button class="btn pink" id="go">Commencer</button></div></div>`;
+  $("#go").onclick=()=>send("start");$("#chg").onclick=newGame;teams();
+}
+function question(rev){
+  const q=ST.q,sol=ST.sol,ans=ST.players.filter(p=>p.last);
+  const split=q.type==="climat"||q.type==="qcm";
+  let side="";
+  if(q.opts){ side=`<div class="opts">${q.opts.map((o,i)=>{const n=ans.filter(p=>p.last.v===o).length,ok=rev&&o===sol.label;
+     return `<div class="opt${rev?(ok?" ok":" dim"):""}"><i class="fill" data-w="${rev&&ans.length?100*n/ans.length:0}"></i><b>${LET[i]}</b><span>${esc(o)}</span>${rev?`<em>${n}</em>`:""}</div>`}).join("")}</div>`; }
+  let mid="";
+  if(q.type==="num") mid=rev?`<div class="bignum num">${esc(solText(q,sol))}<small>${ans.filter(p=>p.last.p===1).length} bonne(s) réponse(s) sur ${ST.players.length}</small></div>`
+     :`<div class="bignum num" style="color:var(--line)">${q.prefix?esc(q.prefix)+" ":""}?${q.unit?" "+esc(q.unit):""}<small>Tape ta réponse sur ton téléphone.</small></div>`;
+  else mid=`<div class="fig">${figure(q)}</div>${side}`;
+  let near="",fast="";
+  if(rev){const f=ans.filter(p=>p.last.p===1).sort((a,b)=>a.last.sec-b.last.sec)[0];if(f)fast=` Réponse parfaite la plus rapide : ${esc(f.name)}, en ${fr(f.last.sec,1)} s.`;}
+  if(rev&&q.type==="clic"){const b=ans.filter(p=>p.last.d!=null).sort((a,b)=>a.last.d-b.last.d)[0];near=b?`Le plus près : ${esc(b.name)}, à ${dkm(b.last.d)}. `:"";}
+  app.innerHTML=`<div class="host"><div class="top"><span><span class="tag">${esc(q.kind)}</span> &nbsp; Question <strong>${ST.qi+1}</strong> sur ${ST.n}</span>
+     <span>Réponses <strong id="cnt">${ST.players.filter(p=>p.answered).length} / ${ST.players.length}</strong> &nbsp; Code <strong>${ST.code}</strong></span></div>
+   <div class="timer"${rev?" hidden":""}><i id="tm"></i></div>
+   <h1>${esc(q.q)}</h1>
+   <div class="mid${split?" split":""}">${mid}</div>
+   <div class="foot">${rev?`<div class="sol"><strong>${q.type==="clic"?near:"Réponse : "+esc(solText(q,sol))}</strong>${esc(sol.why)}${fast}${sol.src?` <span class="top">Source : ${esc(sol.src)}.</span>`:""}</div>`:"<span></span>"}
+     <button class="btn${rev?" pink":""}" id="nx">${rev?"Classement":"Révéler"}</button></div></div>`;
+  $("#nx").onclick=advance;
+  if(q.type==="qcm"&&q.point)mark(dot(q.point.lat,q.point.lon,"pick",null,1.3));
+  if(rev&&q.type==="clic"){ans.forEach(p=>mark(dot(p.last.v.lat,p.last.v.lon,"team",COLORS[p.color])));mark(target(sol.lat,sol.lon));}
+  requestAnimationFrame(()=>requestAnimationFrame(()=>app.querySelectorAll(".fill").forEach(f=>f.style.width=f.dataset.w+"%")));
+  if(!rev)tick();
+}
+function tick(){
+  const el=$("#tm");if(!el||!ST||ST.phase!=="question")return;
+  const left=ST.ends-(Date.now()+off),f=Math.max(0,left/(ST.q.dur*1000));
+  el.style.transform="scaleX("+f+")";
+  if(left<=0)return send("reveal");
+  requestAnimationFrame(tick);
+}
+function scores(){
+  const top=ST.players.slice(0,8),max=Math.max(1,top[0]?top[0].score:1),last=ST.qi+1>=ST.n;
+  app.innerHTML=`<div class="host"><div class="top"><span class="tag">Classement</span><span>Après la question <strong>${ST.qi+1}</strong> sur ${ST.n}</span></div>
+   <div class="board">${top.map((p,i)=>`<div class="rowb"><span class="rk">${i+1}</span><span class="nm">${esc(p.name)}</span><span><i class="bar" style="display:block;background:${COLORS[p.color]}" data-w="${Math.max(2,100*p.score/max)}"></i></span><span class="sc num">${fr(p.score)}</span><span class="dl num">${p.last&&p.last.pts?"+"+fr(p.last.pts):""}</span></div>`).join("")}</div>
+   <div class="foot"><span></span><button class="btn pink" id="nx">${last?"Podium":"Question suivante"}</button></div></div>`;
+  $("#nx").onclick=advance;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>app.querySelectorAll(".bar").forEach(f=>f.style.width=f.dataset.w+"%")));
+}
+function final(){
+  const P=ST.players,ord=[P[1],P[0],P[2]],hs=[34,48,24],rk=[2,1,3];
+  app.innerHTML=`<div class="host"><div class="top"><span class="tag">Podium</span><span>Geoquizz · GEO1118</span></div>
+   <div class="podium">${ord.map((p,i)=>p?`<div class="step"><div class="nm">${esc(p.name)}</div><div class="sc num">${fr(p.score)} points</div><div class="blk" style="background:${COLORS[p.color]}" data-h="${hs[i]}">${rk[i]}</div></div>`:"").join("")}</div>
+   <div class="others">${P.slice(3).map((p,i)=>`<span>${i+4}. ${esc(p.name)} ${fr(p.score)}</span>`).join("")}</div>
+   <div class="foot"><button class="btn line" id="ng">Choisir un autre quiz</button><button class="btn" id="ag">Rejouer avec les mêmes équipes</button></div></div>`;
+  $("#ag").onclick=()=>send("again");$("#ng").onclick=newGame;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>app.querySelectorAll(".blk").forEach(f=>f.style.height=f.dataset.h+"vh")));
+}
+$("#home").onclick=()=>{if(!ST||ST.phase==="lobby"||ST.phase==="final"||confirm("Quitter la partie en cours et revenir à l'accueil ?"))newGame()};
+Promise.all([loadMap(),fetch("/api/quizzes").then(r=>r.json()).then(z=>{QZ=z}).catch(()=>{})]).then(()=>{ if(sess&&sess.code)start(); else gate(); });
+</script></body></html>
